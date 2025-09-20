@@ -92,7 +92,7 @@ st.markdown('<div class="dashboard-title">📄 Automated Resume Relevance Check<
 # -------------------------------
 # Backend URL
 # -------------------------------
-BACKEND_URL = "https://resume-relevance-ai-1.onrender.com/"
+BACKEND_URL = "https://resume-relevance-ai-1.onrender.com/evaluate_batch"
 
 # -------------------------------
 # File Upload Section
@@ -113,21 +113,36 @@ if st.button("🚀 Check Relevance"):
         st.warning("⚠ Please upload a JD and at least one resume.")
     else:
         with st.spinner("⏳ Evaluating resumes..."):
+            # Prepare files for backend
             files = [("resumes", (r.name, r, "application/octet-stream")) for r in resume_files]
             files.append(("jd", (jd_file.name, jd_file, "application/octet-stream")))
-            try:
-                response = requests.post("https://resume-relevance-ai-1.onrender.com/evaluate_batch", files=files)
-                result = response.json()
 
-                # JD Info
+            # Send POST request to backend
+            try:
+                response = requests.post(BACKEND_URL, files=files, timeout=60)
+                
+                if response.status_code == 200:
+                    try:
+                        result = response.json()
+                    except Exception:
+                        st.error("❌ Backend returned non-JSON response.")
+                        st.stop()
+                else:
+                    st.error(f"❌ Backend returned error {response.status_code}: {response.text}")
+                    st.stop()
+
+                # -------------------------------
+                # Display JD Skills
+                # -------------------------------
                 st.markdown('<div class="card"><h3>📌 Job Description Skills</h3></div>', unsafe_allow_html=True)
                 st.markdown(f"JD File: {jd_file.name}")
                 st.write(", ".join(result.get("jd_skills", [])))
 
-                # Scrollable results section
+                # -------------------------------
+                # Display Resume Results
+                # -------------------------------
                 st.markdown('<div class="results-container">', unsafe_allow_html=True)
 
-                # Resume Results
                 for res in result.get("results", []):
                     st.markdown(f'<div class="card"><h3>📝 Resume: {res["resume_filename"]}</h3></div>', unsafe_allow_html=True)
                     st.markdown(f'<div class="score-box">Relevance Score: {res["score"]}/100</div>', unsafe_allow_html=True)
@@ -140,23 +155,16 @@ if st.button("🚀 Check Relevance"):
                         verdict_class = "verdict-low"
                     st.markdown(f'<div class="{verdict_class}">🏆 Fit Verdict: {verdict}</div>', unsafe_allow_html=True)
 
-                    # Enhanced Matched, Missing Skills & Suggestions
                     col1, col2 = st.columns(2)
                     with col1:
                         st.markdown('<div class="card"><h4>✅ Matched Skills</h4></div>', unsafe_allow_html=True)
                         matched = res.get("matched_skills", [])
-                        if matched:
-                            st.markdown(f'<p style="font-size:20px; font-weight:bold; color:#2E8B57;">{", ".join(matched)}</p>', unsafe_allow_html=True)
-                        else:
-                            st.markdown('<p style="font-size:20px; font-weight:bold; color:#E74C3C;">No matched skills found.</p>', unsafe_allow_html=True)
+                        st.markdown(f'<p style="font-size:20px; font-weight:bold; color:#2E8B57;">{", ".join(matched) if matched else "No matched skills found."}</p>', unsafe_allow_html=True)
 
                     with col2:
                         st.markdown('<div class="card"><h4>⚠ Missing Skills</h4></div>', unsafe_allow_html=True)
                         missing = res.get("missing_skills", [])
-                        if missing:
-                            st.markdown(f'<p style="font-size:20px; font-weight:bold; color:#E67E22;">{", ".join(missing)}</p>', unsafe_allow_html=True)
-                        else:
-                            st.markdown('<p style="font-size:20px; font-weight:bold; color:#2ECC71;">No missing skills!</p>', unsafe_allow_html=True)
+                        st.markdown(f'<p style="font-size:20px; font-weight:bold; color:#E67E22;">{", ".join(missing) if missing else "No missing skills!"}</p>', unsafe_allow_html=True)
 
                     st.markdown('<div class="card"><h4>💡 Suggestions</h4></div>', unsafe_allow_html=True)
                     suggestions = res.get("suggestions", [])
@@ -166,7 +174,9 @@ if st.button("🚀 Check Relevance"):
                     else:
                         st.markdown('<p style="font-size:18px; font-weight:bold; color:#7F8C8D;">No suggestions available.</p>', unsafe_allow_html=True)
 
-                st.markdown('</div>', unsafe_allow_html=True)  # close results scroll box
+                st.markdown('</div>', unsafe_allow_html=True)  # Close results container
 
-            except Exception as e:
+            except requests.exceptions.Timeout:
+                st.error("❌ Backend request timed out. Try again.")
+            except requests.exceptions.RequestException as e:
                 st.error(f"❌ Error connecting to backend: {e}")
