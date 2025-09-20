@@ -92,7 +92,7 @@ st.markdown('<div class="dashboard-title">📄 Automated Resume Relevance Check<
 # -------------------------------
 # Backend URL
 # -------------------------------
-BACKEND_URL = "https://resume-relevance-ai-1.onrender.com/evaluate_batch"
+BACKEND_URL = "http://44.251.109.205:8000/evaluate_batch"  # <-- Replace <AWS_PUBLIC_IP> with your EC2 public IP
 
 # -------------------------------
 # File Upload Section
@@ -113,14 +113,12 @@ if st.button("🚀 Check Relevance"):
         st.warning("⚠ Please upload a JD and at least one resume.")
     else:
         with st.spinner("⏳ Evaluating resumes..."):
-            # Prepare files for backend
             files = [("resumes", (r.name, r, "application/octet-stream")) for r in resume_files]
             files.append(("jd", (jd_file.name, jd_file, "application/octet-stream")))
 
-            # Send POST request to backend
             try:
-                response = requests.post(BACKEND_URL, files=files, timeout=60)
-                
+                response = requests.post(BACKEND_URL, files=files, timeout=120)  # increased timeout
+
                 if response.status_code == 200:
                     try:
                         result = response.json()
@@ -131,16 +129,12 @@ if st.button("🚀 Check Relevance"):
                     st.error(f"❌ Backend returned error {response.status_code}: {response.text}")
                     st.stop()
 
-                # -------------------------------
                 # Display JD Skills
-                # -------------------------------
                 st.markdown('<div class="card"><h3>📌 Job Description Skills</h3></div>', unsafe_allow_html=True)
                 st.markdown(f"JD File: {jd_file.name}")
                 st.write(", ".join(result.get("jd_skills", [])))
 
-                # -------------------------------
                 # Display Resume Results
-                # -------------------------------
                 st.markdown('<div class="results-container">', unsafe_allow_html=True)
 
                 for res in result.get("results", []):
@@ -174,7 +168,7 @@ if st.button("🚀 Check Relevance"):
                     else:
                         st.markdown('<p style="font-size:18px; font-weight:bold; color:#7F8C8D;">No suggestions available.</p>', unsafe_allow_html=True)
 
-                st.markdown('</div>', unsafe_allow_html=True)  # Close results container
+                st.markdown('</div>', unsafe_allow_html=True)
 
             except requests.exceptions.Timeout:
                 st.error("❌ Backend request timed out. Try again.")
