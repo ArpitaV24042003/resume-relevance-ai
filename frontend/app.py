@@ -116,7 +116,7 @@ if st.button("🚀 Check Relevance"):
             files = [("resumes", (r.name, r, "application/octet-stream")) for r in resume_files]
             files.append(("jd", (jd_file.name, jd_file, "application/octet-stream")))
             try:
-                response = requests.post("https://resume-relevance-ai-1.onrender.com/", files=files)
+                response = requests.post("https://resume-relevance-ai-1.onrender.com/evaluate_batch", files=files)
                 result = response.json()
 
                 # JD Info
