@@ -1,10 +1,15 @@
+# core/scoring.py
 from fuzzywuzzy import fuzz
-from sentence_transformers import SentenceTransformer, util
-import gc
 
-# Lazy load model for each request
+# Lazy-load the embedding model
+_model = None
+
 def get_model():
-    return SentenceTransformer('all-MiniLM-L6-v2')
+    global _model
+    if _model is None:
+        from sentence_transformers import SentenceTransformer
+        _model = SentenceTransformer('paraphrase-MiniLM-L3-v2')  # smaller model
+    return _model
 
 def hard_match(resume_skills, jd_skills):
     matched = [s for s in resume_skills if s in jd_skills]
@@ -13,10 +18,14 @@ def hard_match(resume_skills, jd_skills):
 
 def semantic_match(resume_text, jd_text):
     model = get_model()
+    from sentence_transformers import util
     embeddings = model.encode([resume_text, jd_text])
     sim = util.cos_sim(embeddings[0], embeddings[1]).item()
-    del model
-    gc.collect()  # free memory
+    
+    # Free memory after use
+    del embeddings
+    import gc; gc.collect()
+    
     return round(sim * 100, 2)
 
 def calculate_score(matched_skills, total_skills, semantic_score, hard_weight=0.6, soft_weight=0.4):

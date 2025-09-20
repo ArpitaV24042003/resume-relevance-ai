@@ -1,14 +1,17 @@
+# backend/main.py
 from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from typing import List
-import gc
+import uvicorn
 
+# --- Core Modules ---
 from core.parser import extract_skills, extract_text_from_pdf, extract_text_from_docx
 from core.scoring import hard_match, semantic_match, calculate_score, fit_verdict
 from core.suggestions import generate_suggestions
 
 app = FastAPI()
 
+# Allow frontend access
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -16,16 +19,19 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
+# --- Helper function ---
 def extract_resume_text(file: UploadFile):
     if file.filename.endswith(".pdf"):
         return extract_text_from_pdf(file.file)
     else:
         return extract_text_from_docx(file.file)
 
+# --- Root endpoint ---
 @app.get("/")
 def root():
     return {"message": "Resume Relevance API is running ✅"}
 
+# --- Batch evaluation endpoint ---
 @app.post("/evaluate_batch")
 async def evaluate_batch(
     resumes: List[UploadFile] = File(...),
@@ -40,10 +46,17 @@ async def evaluate_batch(
         resume_text = extract_resume_text(resume)
         resume_skills = extract_skills(resume_text)
 
+        # --- Hard Match ---
         matched_skills, missing_skills = hard_match(resume_skills, jd_skills)
+
+        # --- Semantic Match ---
         semantic_score = semantic_match(resume_text, jd_text)
+
+        # --- Weighted Final Score ---
         score = calculate_score(matched_skills, len(jd_skills), semantic_score)
         verdict = fit_verdict(score)
+
+        # --- LLM Suggestions ---
         suggestions = generate_suggestions(resume_text, jd_text, missing_skills)
 
         results.append({
@@ -55,11 +68,10 @@ async def evaluate_batch(
             "suggestions": suggestions
         })
 
-        # Free memory after processing each resume
-        del resume_text, resume_skills, matched_skills, missing_skills, suggestions
-        gc.collect()
-
-    del jd_text, jd_skills
-    gc.collect()
+        # Free memory after each resume
+        import gc; gc.collect()
 
     return {"jd_filename": jd.filename, "jd_skills": jd_skills, "results": results}
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=8000)
