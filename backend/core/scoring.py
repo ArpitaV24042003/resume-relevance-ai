@@ -1,8 +1,10 @@
 from fuzzywuzzy import fuzz
 from sentence_transformers import SentenceTransformer, util
+import gc
 
-# Load embedding model
-model = SentenceTransformer('all-MiniLM-L6-v2')
+# Lazy load model for each request
+def get_model():
+    return SentenceTransformer('all-MiniLM-L6-v2')
 
 def hard_match(resume_skills, jd_skills):
     matched = [s for s in resume_skills if s in jd_skills]
@@ -10,9 +12,11 @@ def hard_match(resume_skills, jd_skills):
     return matched, missing
 
 def semantic_match(resume_text, jd_text):
-    # Compute cosine similarity (0-100)
+    model = get_model()
     embeddings = model.encode([resume_text, jd_text])
     sim = util.cos_sim(embeddings[0], embeddings[1]).item()
+    del model
+    gc.collect()  # free memory
     return round(sim * 100, 2)
 
 def calculate_score(matched_skills, total_skills, semantic_score, hard_weight=0.6, soft_weight=0.4):

@@ -20,7 +20,6 @@ def normalize_text(text):
     text = re.sub(r'\n+', '\n', text)
     return text
 
-# Example: simple skill extraction
 def extract_skills(text, skill_list=None):
     if skill_list is None:
         skill_list = ["python", "sql", "java", "c++", "machine learning", "deep learning", "aws"]

@@ -1,12 +1,9 @@
-# Requires OpenAI key: export OPENAI_API_KEY="your_key"
 import openai
+import gc
 
 openai.api_key = "YOUR_OPENAI_API_KEY"
 
 def generate_suggestions(resume_text, jd_text, missing_skills):
-    """
-    Generate personalized improvement suggestions using GPT.
-    """
     prompt = f"""
 You are a career mentor. 
 The student resume is: {resume_text}
@@ -23,7 +20,6 @@ Provide 3-5 concise actionable suggestions for improvement.
             max_tokens=150
         )
         suggestions = response['choices'][0]['message']['content'].split('\n')
-        # Clean empty lines
         return [s.strip('-• ').strip() for s in suggestions if s.strip()]
-    except Exception:
-        return [f"Consider improving: {s}" for s in missing_skills]
+    finally:
+        gc.collect()
