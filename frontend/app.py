@@ -92,7 +92,7 @@ st.markdown('<div class="dashboard-title">📄 Automated Resume Relevance Check<
 # -------------------------------
 # Backend URL
 # -------------------------------
-BACKEND_URL = "https://resume-relevance-ai-1.onrender.com/evaluate_batch"
+BACKEND_URL = "https://resume-relevance-ai-1.onrender.com/"
 
 # -------------------------------
 # File Upload Section
