@@ -117,7 +117,7 @@ if st.button("🚀 Check Relevance"):
             files.append(("jd", (jd_file.name, jd_file, "application/octet-stream")))
 
             try:
-                response = requests.post(BACKEND_URL, files=files, timeout=120)  # increased timeout
+                response = requests.post("http://44.251.109.205:8000/evaluate_batch", files=files, timeout=120)  # increased timeout
 
                 if response.status_code == 200:
                     try:
