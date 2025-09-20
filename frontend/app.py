@@ -1,70 +1,172 @@
 import streamlit as st
 import requests
 
-st.set_page_config(page_title="AI Resume Relevance Checker", page_icon="📄")
+# -------------------------------
+# Page Config
+# -------------------------------
+st.set_page_config(
+    page_title="Automated Resume Relevance Check",
+    page_icon="📄",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
-st.title("📄 AI Resume Relevance Checker")
+# -------------------------------
+# Custom CSS
+# -------------------------------
+st.markdown("""
+<style>
+/* Sidebar */
+.css-1d391kg {background-color: #6A0DAD !important;}
+.css-1d391kg .css-qrbaxs {color: white !important;}
+.css-1d391kg .css-16idsys {color: #dcd6f7 !important;}
 
-# --- Backend URL ---
-BACKEND_URL = "http://127.0.0.1:8000/evaluate"
+/* Title */
+.dashboard-title {
+    font-size: 38px; font-weight: 900;
+    color: #6A0DAD; text-align: center;
+    margin-bottom: 20px;word-wrap: break-word;
+}
 
-# --- Check backend connectivity ---
-try:
-    r = requests.get("http://127.0.0.1:8000/")
-    if r.status_code == 200:
-        st.success("Backend connected ✅")
+/* Card */
+.card {
+    background: white;
+    border-radius: 20px;
+    padding: 20px;
+    margin-bottom: 25px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+}
+
+/* Buttons */
+.stButton>button {
+    background: linear-gradient(90deg, #6A0DAD, #9A4DFF);
+    color: white; font-size:16px; font-weight:bold;
+    padding:12px 28px; border-radius:12px; border:none;
+    cursor:pointer; transition: all 0.3s ease-in-out;
+}
+.stButton>button:hover {
+    background: linear-gradient(90deg, #4B0082, #7A2DE8);
+    transform: scale(1.07);
+}
+
+/* Score Box */
+.score-box {
+    background: linear-gradient(135deg, #6A0DAD, #9A4DFF);
+    color:white; font-size:26px; font-weight:700;
+    text-align:center; border-radius:16px;
+    padding:18px; margin-bottom:20px;
+}
+
+/* Verdict Colors */
+.verdict-high { color: #2ECC71; font-weight:bold; font-size:22px; }
+.verdict-medium { color: #E67E22; font-weight:bold; font-size:22px; }
+.verdict-low { color: #E74C3C; font-weight:bold; font-size:22px; }
+
+/* Scrollable results box */
+.results-container {
+    max-height: 500px;
+    overflow-y: auto;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 12px;
+    background-color: #fafafa;
+}
+</style>
+""", unsafe_allow_html=True)
+
+# -------------------------------
+# Sidebar
+# -------------------------------
+with st.sidebar:
+    st.image("https://img.icons8.com/color/96/000000/document.png", width=100)
+    st.title("Resume Relevance Dashboard")
+    st.markdown("📊 AI-powered JD vs Resume analysis.")
+    st.markdown("👩‍💻 Built with Streamlit")
+    st.markdown("🚀 Theme 2: Modern UI Design")
+
+# -------------------------------
+# Title
+# -------------------------------
+st.markdown('<div class="dashboard-title">📄 Automated Resume Relevance Check</div>', unsafe_allow_html=True)
+
+# -------------------------------
+# Backend URL
+# -------------------------------
+BACKEND_URL = "https://resume-relevance-ai-1.onrender.com/"
+
+# -------------------------------
+# File Upload Section
+# -------------------------------
+col1, col2 = st.columns(2)
+with col1:
+    st.markdown('<div class="card"><h3>📑 Upload Job Description (JD)</h3></div>', unsafe_allow_html=True)
+    jd_file = st.file_uploader("Upload JD (PDF/DOCX)", type=["pdf", "docx"])
+with col2:
+    st.markdown('<div class="card"><h3>📂 Upload Candidate Resumes</h3></div>', unsafe_allow_html=True)
+    resume_files = st.file_uploader("Upload Resumes (PDF/DOCX)", type=["pdf","docx"], accept_multiple_files=True)
+
+# -------------------------------
+# Action Button
+# -------------------------------
+if st.button("🚀 Check Relevance"):
+    if not jd_file or not resume_files:
+        st.warning("⚠ Please upload a JD and at least one resume.")
     else:
-        st.error("Backend not reachable ❌")
-except requests.exceptions.RequestException:
-    st.error("Backend not reachable ❌")
+        with st.spinner("⏳ Evaluating resumes..."):
+            files = [("resumes", (r.name, r, "application/octet-stream")) for r in resume_files]
+            files.append(("jd", (jd_file.name, jd_file, "application/octet-stream")))
+            try:
+                response = requests.post("https://resume-relevance-ai-1.onrender.com/evaluate_batch", files=files)
+                result = response.json()
 
-# --- File upload ---
-resume_file = st.file_uploader("Upload Resume (PDF/DOCX)", type=["pdf", "docx"])
-jd_file = st.file_uploader("Upload Job Description (PDF/DOCX)", type=["pdf", "docx"])
+                # JD Info
+                st.markdown('<div class="card"><h3>📌 Job Description Skills</h3></div>', unsafe_allow_html=True)
+                st.markdown(f"JD File: {jd_file.name}")
+                st.write(", ".join(result.get("jd_skills", [])))
 
-# --- Button action ---
-if st.button("Check Relevance"):
-    if not resume_file or not jd_file:
-        st.warning("Please upload both Resume and Job Description.")
-    else:
-        try:
-            files = {
-                "resume": resume_file,
-                "jd": jd_file
-            }
-            response = requests.post(BACKEND_URL, files=files)
-            result = response.json()
-            
-            if "error" in result:
-                st.error(f"Error from backend: {result['error']}")
-                st.write(result.get("raw", ""))
-            else:
-                # Display score as progress bar
-                score = result.get("score", 0)
-                st.subheader(f"Relevance Score: {score}/100")
-                st.progress(score / 100)
+                # Scrollable results section
+                st.markdown('<div class="results-container">', unsafe_allow_html=True)
 
-                # Matched Skills
-                matched = result.get("matched_skills", [])
-                st.subheader("✅ Matched Skills")
-                if matched:
-                    st.write(", ".join(matched))
-                else:
-                    st.write("No matched skills found.")
+                # Resume Results
+                for res in result.get("results", []):
+                    st.markdown(f'<div class="card"><h3>📝 Resume: {res["resume_filename"]}</h3></div>', unsafe_allow_html=True)
+                    st.markdown(f'<div class="score-box">Relevance Score: {res["score"]}/100</div>', unsafe_allow_html=True)
 
-                # Missing Skills
-                missing = result.get("missing_skills", [])
-                st.subheader("⚠️ Missing Skills")
-                if missing:
-                    st.write(", ".join(missing))
-                else:
-                    st.write("No missing skills!")
+                    verdict = res.get("fit_verdict", "Medium")
+                    verdict_class = "verdict-medium"
+                    if verdict.lower() == "high":
+                        verdict_class = "verdict-high"
+                    elif verdict.lower() == "low":
+                        verdict_class = "verdict-low"
+                    st.markdown(f'<div class="{verdict_class}">🏆 Fit Verdict: {verdict}</div>', unsafe_allow_html=True)
 
-                # Suggestions
-                suggestions = result.get("suggestions", [])
-                st.subheader("💡 Suggestions")
-                for i, s in enumerate(suggestions, start=1):
-                    st.write(f"{i}. {s}")
+                    # Enhanced Matched, Missing Skills & Suggestions
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.markdown('<div class="card"><h4>✅ Matched Skills</h4></div>', unsafe_allow_html=True)
+                        matched = res.get("matched_skills", [])
+                        if matched:
+                            st.markdown(f'<p style="font-size:20px; font-weight:bold; color:#2E8B57;">{", ".join(matched)}</p>', unsafe_allow_html=True)
+                        else:
+                            st.markdown('<p style="font-size:20px; font-weight:bold; color:#E74C3C;">No matched skills found.</p>', unsafe_allow_html=True)
 
-        except requests.exceptions.RequestException as e:
-            st.error(f"Failed to connect to backend: {e}")
+                    with col2:
+                        st.markdown('<div class="card"><h4>⚠ Missing Skills</h4></div>', unsafe_allow_html=True)
+                        missing = res.get("missing_skills", [])
+                        if missing:
+                            st.markdown(f'<p style="font-size:20px; font-weight:bold; color:#E67E22;">{", ".join(missing)}</p>', unsafe_allow_html=True)
+                        else:
+                            st.markdown('<p style="font-size:20px; font-weight:bold; color:#2ECC71;">No missing skills!</p>', unsafe_allow_html=True)
+
+                    st.markdown('<div class="card"><h4>💡 Suggestions</h4></div>', unsafe_allow_html=True)
+                    suggestions = res.get("suggestions", [])
+                    if suggestions:
+                        for i, s in enumerate(suggestions, start=1):
+                            st.markdown(f'<p style="font-size:18px; font-weight:bold; color:#6A0DAD;">{i}. {s}</p>', unsafe_allow_html=True)
+                    else:
+                        st.markdown('<p style="font-size:18px; font-weight:bold; color:#7F8C8D;">No suggestions available.</p>', unsafe_allow_html=True)
+
+                st.markdown('</div>', unsafe_allow_html=True)  # close results scroll box
+
+            except Exception as e:
+                st.error(f"❌ Error connecting to backend: {e}")
