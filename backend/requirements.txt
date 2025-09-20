@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+langchain
+langgraph
+langsmith
+langchain-openai
+openai
+PyPDF2
+python-docx
+python-multipart
+python-dotenv
