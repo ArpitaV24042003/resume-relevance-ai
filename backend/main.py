@@ -1,81 +1,76 @@
-from fastapi import FastAPI, UploadFile
-import uvicorn
+# backend/main.py
+from fastapi import FastAPI, UploadFile, File
+from fastapi.middleware.cors import CORSMiddleware
+from typing import List
 from PyPDF2 import PdfReader
 import docx
-from langchain.prompts import PromptTemplate
-from langchain_openai import ChatOpenAI
-from dotenv import load_dotenv
+import uvicorn
 
-load_dotenv()
+# --- Core Modules ---
+from core.parser import extract_skills, extract_text_from_pdf, extract_text_from_docx
+from core.scoring import hard_match, semantic_match, calculate_score, fit_verdict
+from core.suggestions import generate_suggestions
 
 app = FastAPI()
 
-# ✅ Root endpoint (add here)
+# Allow frontend access
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"]
+)
+
+# --- Helper functions ---
+def extract_resume_text(file: UploadFile):
+    if file.filename.endswith(".pdf"):
+        return extract_text_from_pdf(file.file)
+    else:
+        return extract_text_from_docx(file.file)
+
+# --- Root endpoint ---
 @app.get("/")
 def root():
     return {"message": "Resume Relevance API is running ✅"}
 
-# --- Helper functions ---
-def extract_text_from_pdf(file):
-    reader = PdfReader(file)
-    text = ""
-    for page in reader.pages:
-        text += page.extract_text() or ""
-    return text
+# --- Batch evaluation endpoint ---
+@app.post("/evaluate_batch")
+async def evaluate_batch(
+    resumes: List[UploadFile] = File(...),
+    jd: UploadFile = File(...)
+):
+    jd_text = extract_resume_text(jd)
+    jd_skills = extract_skills(jd_text)
 
-def extract_text_from_docx(file):
-    doc = docx.Document(file)
-    text = "\n".join([para.text for para in doc.paragraphs])
-    return text
+    results = []
 
-# --- LLM setup ---
-llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+    for resume in resumes:
+        resume_text = extract_resume_text(resume)
+        resume_skills = extract_skills(resume_text)
 
-prompt = PromptTemplate(
-    input_variables=["resume", "jd"],
-    template="""
-    You are an expert ATS system.
+        # --- Hard Match ---
+        matched_skills, missing_skills = hard_match(resume_skills, jd_skills)
 
-    Compare the following RESUME with the JOB DESCRIPTION and return output as strict JSON with this structure:
+        # --- Semantic Match (Soft) ---
+        semantic_score = semantic_match(resume_text, jd_text)  # returns 0-100
 
-    {{
-      "score": <int 0-100>,
-      "matched_skills": [list of skills found in both],
-      "missing_skills": [list of skills missing in resume],
-      "suggestions": [3 short suggestions to improve resume relevance]
-    }}
+        # --- Weighted Final Score ---
+        score = calculate_score(matched_skills, len(jd_skills), semantic_score)
+        verdict = fit_verdict(score)
 
-    RESUME: {resume}
-    JOB DESCRIPTION: {jd}
-    """
-)
+        # --- LLM Suggestions ---
+        suggestions = generate_suggestions(resume_text, jd_text, missing_skills)
 
-@app.post("/evaluate")
-async def evaluate(resume: UploadFile, jd: UploadFile):
-    # Extract resume text
-    if resume.filename.endswith(".pdf"):
-        resume_text = extract_text_from_pdf(resume.file)
-    else:
-        resume_text = extract_text_from_docx(resume.file)
+        results.append({
+            "resume_filename": resume.filename,
+            "score": score,
+            "fit_verdict": verdict,
+            "matched_skills": matched_skills,
+            "missing_skills": missing_skills,
+            "suggestions": suggestions
+        })
 
-    # Extract JD text
-    if jd.filename.endswith(".pdf"):
-        jd_text = extract_text_from_pdf(jd.file)
-    else:
-        jd_text = extract_text_from_docx(jd.file)
-
-    # Run chain
-    chain = prompt | llm
-    result = chain.invoke({"resume": resume_text, "jd": jd_text})
-
-    import json
-    try:
-        parsed = json.loads(result.content)
-    except Exception:
-        parsed = {"error": "Failed to parse LLM output", "raw": result.content}
-
-    return parsed
-
+    return {"jd_filename": jd.filename, "jd_skills": jd_skills, "results": results}
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
