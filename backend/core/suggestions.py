@@ -1,7 +1,8 @@
 import openai
 import gc
+import os
 
-openai.api_key = "YOUR_OPENAI_API_KEY"
+openai.api_key = os.getenv("OPENAI_API_KEY")
 
 def generate_suggestions(resume_text, jd_text, missing_skills):
     prompt = f"""
