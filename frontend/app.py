@@ -1,177 +1,218 @@
 import streamlit as st
 import requests
+import pandas as pd
+import os
 
 # -------------------------------
-# Page Config
+# Config
 # -------------------------------
+BACKEND_URL = os.getenv("BACKEND_URL", "http://44.251.109.205:8000")
+
 st.set_page_config(
-    page_title="Automated Resume Relevance Check",
+    page_title="Automated Resume Relevance Check & Dashboard",
     page_icon="📄",
-    layout="wide",
-    initial_sidebar_state="expanded"
+    layout="wide"
 )
 
-# -------------------------------
-# Custom CSS
-# -------------------------------
-st.markdown("""
-<style>
-/* Sidebar */
-.css-1d391kg {background-color: #6A0DAD !important;}
-.css-1d391kg .css-qrbaxs {color: white !important;}
-.css-1d391kg .css-16idsys {color: #dcd6f7 !important;}
-
-/* Title */
-.dashboard-title {
-    font-size: 38px; font-weight: 900;
-    color: #6A0DAD; text-align: center;
-    margin-bottom: 20px;word-wrap: break-word;
-}
-
-/* Card */
-.card {
-    background: white;
-    border-radius: 20px;
-    padding: 20px;
-    margin-bottom: 25px;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.08);
-}
-
-/* Buttons */
-.stButton>button {
-    background: linear-gradient(90deg, #6A0DAD, #9A4DFF);
-    color: white; font-size:16px; font-weight:bold;
-    padding:12px 28px; border-radius:12px; border:none;
-    cursor:pointer; transition: all 0.3s ease-in-out;
-}
-.stButton>button:hover {
-    background: linear-gradient(90deg, #4B0082, #7A2DE8);
-    transform: scale(1.07);
-}
-
-/* Score Box */
-.score-box {
-    background: linear-gradient(135deg, #6A0DAD, #9A4DFF);
-    color:white; font-size:26px; font-weight:700;
-    text-align:center; border-radius:16px;
-    padding:18px; margin-bottom:20px;
-}
-
-/* Verdict Colors */
-.verdict-high { color: #2ECC71; font-weight:bold; font-size:22px; }
-.verdict-medium { color: #E67E22; font-weight:bold; font-size:22px; }
-.verdict-low { color: #E74C3C; font-weight:bold; font-size:22px; }
-
-/* Scrollable results box */
-.results-container {
-    max-height: 500px;
-    overflow-y: auto;
-    padding: 10px;
-    border: 1px solid #ddd;
-    border-radius: 12px;
-    background-color: #fafafa;
-}
-</style>
-""", unsafe_allow_html=True)
+st.markdown("<h1 style='text-align:center;color:#6A0DAD;'>📄 Automated Resume Relevance Check & Dashboard</h1>", unsafe_allow_html=True)
 
 # -------------------------------
-# Sidebar
+# Tabs
 # -------------------------------
-with st.sidebar:
-    st.image("https://img.icons8.com/color/96/000000/document.png", width=100)
-    st.title("Resume Relevance Dashboard")
-    st.markdown("📊 AI-powered JD vs Resume analysis.")
-    st.markdown("👩‍💻 Built with Streamlit")
-    st.markdown("🚀 Theme 2: Modern UI Design")
+tab1, tab2 = st.tabs(["Evaluate Resumes", "Dashboard"])
 
 # -------------------------------
-# Title
+# Tab 1: Evaluate Resumes
 # -------------------------------
-st.markdown('<div class="dashboard-title">📄 Automated Resume Relevance Check</div>', unsafe_allow_html=True)
+with tab1:
+    st.subheader("Upload Job Description and Resumes")
+    col1, col2 = st.columns(2)
+    with col1:
+        jd_file = st.file_uploader("Upload Job Description (PDF/DOCX)", type=["pdf", "docx"])
+    with col2:
+        resume_files = st.file_uploader("Upload Resumes (PDF/DOCX)", type=["pdf","docx"], accept_multiple_files=True)
 
-# -------------------------------
-# Backend URL
-# -------------------------------
-BACKEND_URL = "http://44.251.109.205:8000"  # <-- Replace <AWS_PUBLIC_IP> with your EC2 public IP
+    if st.button("🚀 Evaluate Resumes"):
+        if not jd_file or not resume_files:
+            st.warning("⚠ Please upload a JD and at least one resume.")
+        else:
+            with st.spinner("⏳ Evaluating resumes..."):
+                files = [("resumes", (r.name, r, "application/octet-stream")) for r in resume_files]
+                files.append(("jd", (jd_file.name, jd_file, "application/octet-stream")))
 
-# -------------------------------
-# File Upload Section
-# -------------------------------
-col1, col2 = st.columns(2)
-with col1:
-    st.markdown('<div class="card"><h3>📑 Upload Job Description (JD)</h3></div>', unsafe_allow_html=True)
-    jd_file = st.file_uploader("Upload JD (PDF/DOCX)", type=["pdf", "docx"])
-with col2:
-    st.markdown('<div class="card"><h3>📂 Upload Candidate Resumes</h3></div>', unsafe_allow_html=True)
-    resume_files = st.file_uploader("Upload Resumes (PDF/DOCX)", type=["pdf","docx"], accept_multiple_files=True)
-
-# -------------------------------
-# Action Button
-# -------------------------------
-if st.button("🚀 Check Relevance"):
-    if not jd_file or not resume_files:
-        st.warning("⚠ Please upload a JD and at least one resume.")
-    else:
-        with st.spinner("⏳ Evaluating resumes..."):
-            files = [("resumes", (r.name, r, "application/octet-stream")) for r in resume_files]
-            files.append(("jd", (jd_file.name, jd_file, "application/octet-stream")))
-
-            try:
-                response = requests.post("http://44.251.109.205:8000/evaluate_batch", files=files, timeout=120)  # increased timeout
-
-                if response.status_code == 200:
-                    try:
+                try:
+                    response = requests.post(f"{BACKEND_URL}/evaluate_batch", files=files, timeout=120)
+                    if response.status_code == 200:
                         result = response.json()
-                    except Exception:
-                        st.error("❌ Backend returned non-JSON response.")
-                        st.stop()
-                else:
-                    st.error(f"❌ Backend returned error {response.status_code}: {response.text}")
-                    st.stop()
+                        st.success("✅ Evaluation complete!")
+                        
+                        st.markdown("### Job Description Skills")
+                        st.write(", ".join(result.get("jd_skills", [])))
 
-                # Display JD Skills
-                st.markdown('<div class="card"><h3>📌 Job Description Skills</h3></div>', unsafe_allow_html=True)
-                st.markdown(f"JD File: {jd_file.name}")
-                st.write(", ".join(result.get("jd_skills", [])))
-
-                # Display Resume Results
-                st.markdown('<div class="results-container">', unsafe_allow_html=True)
-
-                for res in result.get("results", []):
-                    st.markdown(f'<div class="card"><h3>📝 Resume: {res["resume_filename"]}</h3></div>', unsafe_allow_html=True)
-                    st.markdown(f'<div class="score-box">Relevance Score: {res["score"]}/100</div>', unsafe_allow_html=True)
-
-                    verdict = res.get("fit_verdict", "Medium")
-                    verdict_class = "verdict-medium"
-                    if verdict.lower() == "high":
-                        verdict_class = "verdict-high"
-                    elif verdict.lower() == "low":
-                        verdict_class = "verdict-low"
-                    st.markdown(f'<div class="{verdict_class}">🏆 Fit Verdict: {verdict}</div>', unsafe_allow_html=True)
-
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        st.markdown('<div class="card"><h4>✅ Matched Skills</h4></div>', unsafe_allow_html=True)
-                        matched = res.get("matched_skills", [])
-                        st.markdown(f'<p style="font-size:20px; font-weight:bold; color:#2E8B57;">{", ".join(matched) if matched else "No matched skills found."}</p>', unsafe_allow_html=True)
-
-                    with col2:
-                        st.markdown('<div class="card"><h4>⚠ Missing Skills</h4></div>', unsafe_allow_html=True)
-                        missing = res.get("missing_skills", [])
-                        st.markdown(f'<p style="font-size:20px; font-weight:bold; color:#E67E22;">{", ".join(missing) if missing else "No missing skills!"}</p>', unsafe_allow_html=True)
-
-                    st.markdown('<div class="card"><h4>💡 Suggestions</h4></div>', unsafe_allow_html=True)
-                    suggestions = res.get("suggestions", [])
-                    if suggestions:
-                        for i, s in enumerate(suggestions, start=1):
-                            st.markdown(f'<p style="font-size:18px; font-weight:bold; color:#6A0DAD;">{i}. {s}</p>', unsafe_allow_html=True)
+                        for res in result.get("results", []):
+                            st.markdown(f"### 📝 {res.get('resume_filename', 'Unknown')}")
+                            st.write("**Score:**", res.get("score", "N/A"))
+                            st.write("**Verdict:**", res.get("fit_verdict", "N/A"))
+                            st.write("**Matched Skills:**", ", ".join(res.get("matched_skills", [])))
+                            st.write("**Missing Skills:**", ", ".join(res.get("missing_skills", [])))
+                            st.write("**Suggestions:**")
+                            for s in res.get("suggestions", []):
+                                st.write("-", s)
                     else:
-                        st.markdown('<p style="font-size:18px; font-weight:bold; color:#7F8C8D;">No suggestions available.</p>', unsafe_allow_html=True)
+                        st.error(f"❌ Backend error {response.status_code}: {response.text}")
+                except requests.exceptions.RequestException as e:
+                    st.error(f"❌ Backend request failed: {e}")
 
-                st.markdown('</div>', unsafe_allow_html=True)
+# -------------------------------
+# Tab 2: Dashboard
+# -------------------------------
+with tab2:
+    st.subheader("Placement Team Dashboard: All Evaluations")
+    try:
+        resp = requests.get(f"{BACKEND_URL}/evaluations")
+        data = resp.json()
 
-            except requests.exceptions.Timeout:
-                st.error("❌ Backend request timed out. Try again.")
-            except requests.exceptions.RequestException as e:
-                st.error(f"❌ Error connecting to backend: {e}")
-API_URL = "http://44.251.109.205:8000"
+        # Ensure data is a list of dicts
+        if isinstance(data, dict):
+            data = [data]  # wrap single dict in a list
+        elif not isiimport streamlit as st
+import requests
+import pandas as pd
+import os
+
+# -------------------------------
+# Configuration
+# -------------------------------
+# Use an environment variable for the backend URL, with a default for local testing
+BACKEND_URL = os.getenv("BACKEND_URL", "http://34.221.106.207:8000")
+
+# Page configuration
+st.set_page_config(
+    page_title="Automated Resume Relevance Dashboard",
+    page_icon="📄",
+    layout="wide"
+)
+
+# Main title
+st.markdown("<h1 style='text-align:center;color:#6A0DAD;'>📄 Automated Resume Relevance Check & Dashboard</h1>", unsafe_allow_html=True)
+
+# -------------------------------
+# Tabs for navigation
+# -------------------------------
+tab1, tab2 = st.tabs(["Evaluate Resumes", "Evaluation Dashboard"])
+
+# -------------------------------
+# Tab 1: Evaluate Resumes
+# -------------------------------
+with tab1:
+    st.subheader("Upload Job Description and Resumes")
+    col1, col2 = st.columns(2)
+    with col1:
+        jd_file = st.file_uploader("Upload Job Description (PDF/DOCX)", type=["pdf", "docx"], key="jd_uploader")
+    with col2:
+        resume_files = st.file_uploader("Upload Resumes (PDF/DOCX)", type=["pdf", "docx"], accept_multiple_files=True, key="resume_uploader")
+
+    if st.button("🚀 Evaluate Resumes"):
+        if not jd_file or not resume_files:
+            st.warning("⚠️ Please upload a Job Description and at least one resume.")
+        else:
+            with st.spinner("⏳ Evaluating resumes... This may take a moment."):
+                # Prepare files for the multipart/form-data request
+                files = [("resumes", (r.name, r.getvalue(), r.type)) for r in resume_files]
+                files.append(("jd", (jd_file.name, jd_file.getvalue(), jd_file.type)))
+
+                try:
+                    # Make the API call to the backend
+                    response = requests.post(f"{BACKEND_URL}/evaluate_batch", files=files, timeout=180) # Increased timeout for long evaluations
+                    response.raise_for_status()  # Raise an exception for bad status codes (4xx or 5xx)
+
+                    result = response.json()
+                    st.success("✅ Evaluation complete!")
+                    
+                    # Display Job Description Skills
+                    st.markdown("### Job Description Skills")
+                    st.info(", ".join(result.get("jd_skills", ["No skills extracted."])))
+
+                    # Display results for each resume
+                    for res in result.get("results", []):
+                        with st.expander(f"📝 {res.get('resume_filename', 'Unknown Resume')} - Score: {res.get('score', 'N/A')}"):
+                            st.markdown(f"**Verdict:** `{res.get('fit_verdict', 'N/A')}`")
+                            st.markdown("**Matched Skills:**")
+                            st.success(", ".join(res.get("matched_skills", ["None"])))
+                            st.markdown("**Missing Skills:**")
+                            st.warning(", ".join(res.get("missing_skills", ["None"])))
+                            st.markdown("**Suggestions:**")
+                            for suggestion in res.get("suggestions", []):
+                                st.write(f"- {suggestion}")
+                
+                except requests.exceptions.HTTPError as e:
+                    st.error(f"❌ Backend error {e.response.status_code}: {e.response.text}")
+                except requests.exceptions.RequestException as e:
+                    st.error(f"❌ Request failed: Could not connect to the backend. Please ensure it's running. Details: {e}")
+
+# -------------------------------
+# Tab 2: Dashboard
+# -------------------------------
+with tab2:
+    st.subheader("Placement Team Dashboard: All Evaluations")
+    try:
+        resp = requests.get(f"{BACKEND_URL}/evaluations", timeout=60)
+        resp.raise_for_status() # Check for HTTP errors
+        
+        raw_data = resp.json()
+
+        # --- FIX: Normalize data to always be a list of dictionaries ---
+        if isinstance(raw_data, dict):
+            # If the API returns a single object, wrap it in a list
+            processed_data = [raw_data]
+        elif isinstance(raw_data, list):
+            # If the API returns a list, use it directly
+            processed_data = raw_data
+        else:
+            # If the API returns something else (e.g., null), treat it as empty
+            processed_data = []
+
+        if processed_data:
+            # Now, creating the DataFrame is safe
+            df = pd.DataFrame(processed_data)
+
+            # --- Improved Filtering ---
+            # Ensure 'verdict' column exists before trying to filter
+            if 'verdict' in df.columns:
+                # Get unique, non-null verdict options for the filter
+                options = df['verdict'].dropna().unique()
+                if len(options) > 0:
+                    filter_verdict = st.multiselect("Filter by Verdict", options=options)
+                    if filter_verdict:
+                        # Apply filter if any options are selected
+                        df = df[df['verdict'].isin(filter_verdict)]
+            
+            st.dataframe(df)
+        else:
+            st.info("No evaluation data found. Evaluate some resumes in the first tab to see results here.")
+
+    except requests.exceptions.RequestException as e:
+        st.error(f"❌ Could not fetch evaluations from the backend: {e}")
+    except ValueError:
+        # This catches JSON decoding errors if the backend response isn't valid JSON
+        st.error("❌ Failed to decode data from the backend. The response was not in a valid format.")
+nstance(data, list):
+            data = []  # fallback if something unexpected is returned
+
+        # Make sure each item is a dict
+        data = [item if isinstance(item, dict) else {} for item in data]
+
+        if data:
+            df = pd.DataFrame(data)
+            if 'verdict' in df.columns:
+                filter_verdict = st.multiselect("Filter by Verdict", options=df['verdict'].unique())
+                if filter_verdict:
+                    df = df[df['verdict'].isin(filter_verdict)]
+            st.dataframe(df)
+        else:
+            st.info("No evaluations found yet.")
+
+    except requests.exceptions.RequestException as e:
+        st.error(f"❌ Could not fetch evaluations from backend: {e}")
+    except ValueError as ve:
+        st.error(f"❌ Data format error: {ve}")
