@@ -92,7 +92,7 @@ st.markdown('<div class="dashboard-title">📄 Automated Resume Relevance Check<
 # -------------------------------
 # Backend URL
 # -------------------------------
-BACKEND_URL = "http://44.251.109.205:8000/evaluate_batch"  # <-- Replace <AWS_PUBLIC_IP> with your EC2 public IP
+BACKEND_URL = "http://44.251.109.205:8000"  # <-- Replace <AWS_PUBLIC_IP> with your EC2 public IP
 
 # -------------------------------
 # File Upload Section
@@ -174,3 +174,4 @@ if st.button("🚀 Check Relevance"):
                 st.error("❌ Backend request timed out. Try again.")
             except requests.exceptions.RequestException as e:
                 st.error(f"❌ Error connecting to backend: {e}")
+API_URL = "http://44.251.109.205:8000"
