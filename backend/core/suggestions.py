@@ -1,10 +1,15 @@
+# core/suggestions.py
+import os
 import openai
 import gc
-import os
 
+# Use environment variable, do NOT hardcode your key
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
 def generate_suggestions(resume_text, jd_text, missing_skills):
+    if not openai.api_key:
+        return ["OpenAI API key not set. Suggestions not available."]
+    
     prompt = f"""
 You are a career mentor. 
 The student resume is: {resume_text}
