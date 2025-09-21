@@ -1,4 +1,3 @@
-# core/scoring.py
 from fuzzywuzzy import fuzz
 
 _model = None
@@ -25,7 +24,7 @@ def semantic_match(resume_text, jd_text):
     return round(sim * 100, 2)
 
 def calculate_score(matched_skills, total_skills, semantic_score, hard_weight=0.6, soft_weight=0.4):
-    hard_score = (len(matched_skills) / total_skills * 100) if total_skills else 0
+    hard_score = (len(matched_skills) / total_skills) * 100 if total_skills else 0
     return round(hard_score * hard_weight + semantic_score * soft_weight, 2)
 
 def fit_verdict(score):
